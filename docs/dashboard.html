@@ -23,6 +23,13 @@
 </head>
 <body class="dashboard-body">
 
+  <div id="offline-banner" class="offline-banner d-none">
+    <i class="bi bi-wifi-off"></i>
+    You're offline. Changes won't be saved until your connection is back.
+  </div>
+
+  <div id="toast" class="toast d-none"></div>
+
   <div id="sidebar-overlay" class="sidebar-overlay"></div>
 
   <aside id="sidebar" class="sidebar">
@@ -116,6 +123,12 @@
         <span id="category-count">0</span>
         <p>Categories Used</p>
       </article>
+    </section>
+
+    <section id="loading-state" class="loading-state d-none">
+      <div class="spinner"></div>
+      <p>Loading your notes...</p>
+      <p id="loading-slow-msg" class="loading-slow-msg d-none">This is taking longer than usual, still working...</p>
     </section>
 
     <section id="notes-grid" class="notes-grid"></section>

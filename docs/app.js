@@ -37,6 +37,27 @@ function showAuthMessage(message, type = 'error') {
     .css('background', type === 'success' ? 'rgba(0,255,136,0.12)' : 'rgba(255,56,96,0.12)');
 }
 
+// Shows a brief toast confirmation (success/error) on the dashboard
+let toastTimeoutId = null;
+function showToast(message, type = 'success') {
+  const toast = $('#toast');
+  if (toast.length === 0) return;
+
+  clearTimeout(toastTimeoutId);
+
+  toast
+    .removeClass('d-none toast-error')
+    .toggleClass('toast-error', type === 'error')
+    .text(message);
+
+  toastTimeoutId = setTimeout(() => toast.addClass('d-none'), 3000);
+}
+
+// Reflects browser online/offline status in the offline banner
+function updateOnlineStatus() {
+  $('#offline-banner').toggleClass('d-none', navigator.onLine);
+}
+
 // Handles user login
 async function handleLogin(email, password) {
   const data = await apiCall('/auth/login', 'POST', { email, password });
@@ -81,10 +102,25 @@ async function loadNotes(search = '', category = activeCategory) {
   if (category) queryParams.push(`category=${encodeURIComponent(category)}`);
   if (queryParams.length > 0) endpoint += `?${queryParams.join('&')}`;
 
-  allNotes = await apiCall(endpoint);
-  renderNotes(allNotes);
-  updateStats(allNotes);
-  renderCategories(allNotes);
+  const loadingState = $('#loading-state');
+  const slowMsg = $('#loading-slow-msg');
+
+  $('#empty-state').addClass('d-none');
+  $('#notes-grid').empty();
+  loadingState.removeClass('d-none');
+  slowMsg.addClass('d-none');
+
+  const slowTimeoutId = setTimeout(() => slowMsg.removeClass('d-none'), 5000);
+
+  try {
+    allNotes = await apiCall(endpoint);
+    renderNotes(allNotes);
+    updateStats(allNotes);
+    renderCategories(allNotes);
+  } finally {
+    clearTimeout(slowTimeoutId);
+    loadingState.addClass('d-none');
+  }
 }
 
 // Renders all note cards
@@ -154,6 +190,13 @@ function openNoteModal(note = null) {
   noteModal.show();
 }
 
+// Validates required note fields before submit
+function validateNoteForm(noteData) {
+  if (!noteData.title) return 'Title is required.';
+  if (!noteData.content) return 'Content is required.';
+  return null;
+}
+
 // Saves note to backend
 async function saveNote() {
   const noteId = $('#note-id').val();
@@ -166,6 +209,17 @@ async function saveNote() {
     isPinned: $('#note-pinned').is(':checked')
   };
 
+  const validationError = validateNoteForm(noteData);
+  if (validationError) {
+    $('#note-form-message').removeClass('d-none').text(validationError);
+    return;
+  }
+
+  if (!navigator.onLine) {
+    $('#note-form-message').removeClass('d-none').text('You are offline. Reconnect and try again.');
+    return;
+  }
+
   if (noteId) {
     await apiCall(`/notes/${noteId}`, 'PUT', noteData);
   } else {
@@ -174,6 +228,7 @@ async function saveNote() {
 
   noteModal.hide();
   await loadNotes($('#search-input').val().trim(), activeCategory);
+  showToast(noteId ? 'Note updated successfully.' : 'Note created successfully.');
 }
 
 // Toggles note pin status
@@ -251,6 +306,10 @@ function escapeHtml(text) {
 }
 
 $(document).ready(async function () {
+  updateOnlineStatus();
+  window.addEventListener('online', updateOnlineStatus);
+  window.addEventListener('offline', updateOnlineStatus);
+
   if ($('#login-form').length) {
     $('#show-register-btn').on('click', function () {
       $('#login-form').addClass('d-none');
